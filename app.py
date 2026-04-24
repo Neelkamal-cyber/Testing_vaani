@@ -13,7 +13,7 @@ from tensorflow.keras.models import load_model
 from streamlit_autorefresh import st_autorefresh
 
 # --- OS Level Optimizations ---
-os.environ = "1"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "1"
 
 # --- Constants & Page Config ---
 st.set_page_config(page_title="VAANI · Sign Language AI", layout="wide")
@@ -25,8 +25,8 @@ SEQUENCE_LENGTH = 60
 def get_ice_servers():
     """Retrieve Twilio TURN credentials from st.secrets, falling back to STUN."""
     try:
-        tw_sid = st.secrets
-        tw_token = st.secrets
+        tw_sid = st.secrets["TWILIO_ACCOUNT_SID"]
+        tw_token = st.secrets["TWILIO_AUTH_TOKEN"]
         client = Client(tw_sid, tw_token)
         token = client.tokens.create()
         return token.ice_servers
@@ -54,13 +54,13 @@ class VANIProcessor:
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5,
         )
-        self.sequence =
-        self.predictions =
+        self.sequence = []
+        self.predictions = []
         
         # Thread-safe state variables guarded by a mutex lock
         self.lock = threading.Lock()
         self.current_word = ""
-        self.sentence =
+        self.sentence = []
         self.frames_since_sign = 0
 
     def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
@@ -76,7 +76,7 @@ class VANIProcessor:
         # kp = extract_features(results)
         kp = np.zeros(258) # Placeholder for narrative
         self.sequence.append(kp)
-        self.sequence = self.sequence
+        self.sequence = self.sequence[-SEQUENCE_LENGTH:]
 
         if len(self.sequence) == SEQUENCE_LENGTH:
             inp = np.expand_dims(self.sequence, axis=0)
@@ -92,10 +92,10 @@ class VANIProcessor:
                     word = idx_to_word.get(pi, "?")
                     # Safely mutate state using the lock
                     with self.lock:
-                        if word!= self.current_word:
+                        if word != self.current_word:
                             self.current_word = word
                             self.frames_since_sign = 0
-                            if not self.sentence or self.sentence[-1]!= word:
+                            if not self.sentence or self.sentence[-1] != word:
                                 self.sentence.append(word)
                                 self.sentence = self.sentence[-8:]
             else:
